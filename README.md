@@ -100,8 +100,8 @@ void loop() {
 
       tone(BUZZERPIN, buzzerFreq, 500);  // 계산된 주파수로 소리 낸다
 
-      // Abot이 오른쪽으로 회전 (지속적으로 빙글빙글)
-      rotateRight();
+      // Abot이 제자리에서 춤추기
+      dance();
     } else if ((h >= 30 && h <= 39) || (h >= 61 && h <= 70) || 
                (t >= 15 && t <= 19) || (t >= 26 && t <= 30)) {
       digitalWrite(LEDPIN_LOW, HIGH);
@@ -123,77 +123,144 @@ void rotateRight() {
   leftWheel.write(120);  // 왼쪽 바퀴 전진
   rightWheel.write(60);  // 오른쪽 바퀴 후진
   delay(500);            // 회전 0.5초
-  //실제론 끊임없이 값을 받아 움직임 값이 초기화되기 때문에 마치 춤추는 것 같은 모양새가 된다.
 }
+
+void rotateLeft() {
+  leftWheel.write(60);   // 왼쪽 바퀴 후진
+  rightWheel.write(120); // 오른쪽 바퀴 전진
+  delay(500);            // 회전 0.5초
+}
+
+void dance() {
+  rotateRight();
+  delay(250);            // 잠시 멈춤
+  rotateLeft();
+  delay(250);            // 잠시 멈춤
+}
+
 해설
 사용된 라이브러리
--Servo: 서보 모터의 제어를 위한 라이브러리.
--DHT: DHT11 센서의 온도와 습도 데이터를 읽는 데 사용.
+1.Servo: 서보 모터를 제어하기 위해 사용합니다. 서보 모터는 Abot의 바퀴 역할을 하며, 이동과 회전을 담당합니다.
+-attach(pin): 지정된 핀에 서보 모터 연결.
+-write(angle): 서보 모터의 각도를 설정하여 정지 또는 이동 동작 수행.
+2.DHT: DHT11 센서에서 온도와 습도를 읽어옵니다.
+-readHumidity(): 현재 습도를 반환.
+-readTemperature(): 현재 온도를 반환.
 
 DHT11 센서
-주변 환경의 온도와 습도를 측정.
-readHumidity()와 readTemperature() 함수를 사용하여 값을 읽음.
-측정값이 유효하지 않으면 오류 메시지(Serial.println("센서 읽기 실패!");)를 출력
-if (h >= 40 && h <= 60 && t >= 20 && t <= 26) {
-    digitalWrite(LEDPIN_MID, HIGH);
+1.역할: 주변 환경의 온도와 습도를 측정합니다.
+2.코드 동작:
+-dht.readHumidity(): 현재 습도를 읽어와 변수 h에 저장.
+-dht.readTemperature(): 현재 온도를 읽어와 변수 t에 저장.
+-오류 처리: 값이 유효하지 않을 경우 메시지를 출력하고 return으로 중단.
+if (isnan(h) || isnan(t)) {
+    Serial.println("센서 읽기 실패!");
+    return;
 }
 
 LED
-세 개의 LED 핀(LOW: 5번, MID: 6번, HIGH: 3번)은 환경 상태를 나타냄.
-예를 들어, 쾌적한 상태에서는 MID LED를 점등
+1.역할: 온도와 습도 상태에 따라 Abot의 환경 상태를 시각적으로 표시합니다.
+2.LED 핀 정의:
+-LEDPIN_LOW (5번 핀): 경계 상태를 나타냄.
+-LEDPIN_MID (6번 핀): 쾌적한 상태를 나타냄.
+-LEDPIN_HIGH (3번 핀): 위험 상태를 나타냄.
+LED 제어 조건:
+1.쾌적한 상태:
+-습도: 40~60%
+-온도: 20~26°C
+-동작: LEDPIN_MID 켜짐
+if (h >= 40 && h <= 60 && t >= 20 && t <= 26) {
+    digitalWrite(LEDPIN_MID, HIGH);
+}
+2.경계 상태:
+-습도: 3039% 또는 6170%
+-온도: 1519°C 또는 2630°C
+-동작: LEDPIN_LOW 켜짐.
+if ((h >= 30 && h <= 39) || (h >= 61 && h <= 70) || 
+    (t >= 15 && t <= 19) || (t >= 26 && t <= 30)) {
+    digitalWrite(LEDPIN_LOW, HIGH);
+}
+3.위험 상태:
+-습도: 30% 미만 또는 70% 초과
+-온도: 15°C 미만 또는 30°C 초과
+-동작: LEDPIN_HIGH 켜짐, 스피커 경고음 발생, Abot이 회전.
+if ((h < 30 || h > 70) || (t < 15 || t > 30)) {
+    digitalWrite(LEDPIN_HIGH, HIGH);
+    tone(BUZZERPIN, buzzerFreq, 500);
+    dance();
+}
 
 서보 모터
-두 개의 서보 모터(12번, 13번 핀)는 Abot의 바퀴를 제어.
-정지
+역할: Abot의 바퀴를 제어하여 이동과 회전 동작을 수행합니다.
+핀 정의:
+-왼쪽 모터: 12번 핀.
+-오른쪽 모터: 13번 핀.
+제어 방법:
+1.정지:
 leftWheel.write(90);
 rightWheel.write(90);
-회전(다만 본 코드에서는 값 초기화까지 고려하여 실질적으로는 춤추는 코드로 쓰임)
+2.회전:
 leftWheel.write(120); // 왼쪽 바퀴 전진
 rightWheel.write(60);  // 오른쪽 바퀴 후진
+delay(500);            // 0.5초 동안 회전
 
 피에조 스피커
-온도와 습도가 임계치를 벗어난 경우 경고음을 발생.
-벗어난 정도에 따라 소리의 주파수가 증가
-int h_diff = abs(h - 50);  // 목표 습도 50%와 차이
-int t_diff = abs(t - 23);  // 목표 온도 23도와 차이
-int buzzerFreq = 1000 + (h_diff + t_diff) * 10;
+역할: 온도와 습도가 정상 범위를 벗어난 경우 경고음을 발생시킵니다.
+특징:
+-온도와 습도의 이상 정도에 따라 소리의 주파수를 변경합니다.
+int h_diff = abs(h - 50);  // 목표 습도 50%에서 차이
+int t_diff = abs(t - 23);  // 목표 온도 23도에서 차이
+buzzerFreq = 1000 + (h_diff + t_diff) * 10; // 차이에 비례하여 주파수 증가
 tone(BUZZERPIN, buzzerFreq, 500);
 
 초기화 (setup())
-DHT 센서와 서보 모터를 초기화.
-LED와 스피커 핀의 출력 설정.
-서보 모터는 정지 상태로 시작
+역할:
+-DHT 센서와 서보 모터를 초기화.
+-LED와 스피커 핀을 출력으로 설정.
+-서보 모터는 초기 상태로 정지 설정.
+leftWheel.write(90);  // 정지
+rightWheel.write(90); // 정지
+delay(1000);          // 초기화 대기
 
 환경 측정 및 반응 (loop())
-매 1.25초마다 온도와 습도를 측정.
-값에 따라 LED, 스피커, 모터를 제어
+-1.25초 간격으로 센서 값 읽기
+if (currentMillis - previousMillis >= interval) {
+    previousMillis = currentMillis;
+}
+-온도와 습도 측정:
+dht.readHumidity()와 dht.readTemperature()로 값을 읽어옴.
+-LED, 스피커, 모터 제어:
+측정된 값에 따라 LED 상태와 스피커 주파수 설정.
+경계 또는 위험 상태일 경우, Abot이 회전 또는 정지.
 
-환경 상태별 동작:
-쾌적한 상태 (습도 40~60%, 온도 20~26도):
-MID LED 켜짐, Abot 정지.
+환경 상태별 동작 요약
+1.쾌적한 상태:
+-MID LED 점등.
+-Abot 정지.
 digitalWrite(LEDPIN_MID, HIGH);
-
-경계 상태 (습도 30~39% 또는 61~70%, 온도 15~19도 또는 26~30도):
-LOW LED 켜짐, Abot 정지.
+leftWheel.write(90);
+rightWheel.write(90);
+2.경계 상태:
+-LOW LED 점등.
+-Abot 정지.
 digitalWrite(LEDPIN_LOW, HIGH);
-
-위험 상태 (습도 30% 미만 또는 70% 초과, 온도 15도 미만 또는 30도 초과):
-HIGH LED 켜짐, 스피커 경고음 재생, Abot 회전.
+leftWheel.write(90);
+rightWheel.write(90);
+3.위험 상태:
+-HIGH LED 점등.
+-스피커 경고음.
+-Abot 회전(춤).
 digitalWrite(LEDPIN_HIGH, HIGH);
 tone(BUZZERPIN, buzzerFreq, 500);
-rotateRight();
-
-모터 회전 (rotateRight())
-Abot이 오른쪽으로 회전하는 동작:
-leftWheel.write(120);
-rightWheel.write(60);
-delay(500);
-
+dance();
 시리얼 모니터 출력
-현재 측정된 온도와 습도를 출력하고, 최고 기록도 함께 표시
+현재 상태:
+1.온도: t
+2.습도: h
+3.최고 온도와 습도 기록: tt와 hh.
 Serial.println("h" + String(h));
 Serial.println("t" + String(t));
-Serial.println("a" + String(hh))
+Serial.println("a" + String(hh));
 Serial.println("b" + String(tt));
 
 앱인벤터
